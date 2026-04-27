@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus | App Hub & Manager v1</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        dark: {
+                            bg: '#050505',
+                            card: 'rgba(20, 20, 20, 0.6)',
+                            border: 'rgba(255, 255, 255, 0.08)'
+                        }
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slideIn': 'slideIn 0.3s forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        slideIn: {
+                            from: { opacity: 0, transform: 'translateX(20px)' },
+                            to: { opacity: 1, transform: 'translateX(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        body { background-color: #050505; color: #e2e8f0; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+        .glass {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(30,30,30,0.8) 0%, rgba(15,15,15,0.9) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus { border-color: #38bdf8; outline: none; }
+
+        .card-hover:hover {
+            transform: translateY(-5px) scale(1.02);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 15px 30px -10px rgba(56, 189, 248, 0.15);
+        }
+
+        .view-section { display: none; opacity: 0; }
+        .view-section.active { display: block; opacity: 1; animation: slideIn 0.4s ease forwards; }
+
+        .deploy-tab { display: none; }
+        .deploy-tab.active { display: block; animation: slideIn 0.4s ease forwards; }
+
+        .terminal { background: #0a0a0a; border: 1px solid #222; }
+        
+        .bg-shape { position: fixed; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.4; }
+        .shape-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: rgba(56, 189, 248, 0.15); animation: blob 8s infinite alternate; }
+        .shape-2 { bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: rgba(99, 102, 241, 0.15); animation: blob 10s infinite alternate-reverse; }
+
+        /* Step Indicator */
+        .step-circle { transition: all 0.3s ease; }
+        .step-active .step-circle { background: #0ea5e9; color: white; border-color: #0ea5e9; box-shadow: 0 0 15px rgba(14,165,233,0.4); }
+        .step-completed .step-circle { background: #10b981; color: white; border-color: #10b981; }
+        .step-active .step-text { color: white; font-weight: 600; }
+        .step-completed .step-text { color: #94a3b8; }
+        
+        .toast-enter { animation: slideIn 0.3s forwards; }
+        .toast-exit { animation: slideOut 0.3s forwards; }
+        @keyframes slideOut { to { transform: translateX(100%); opacity: 0; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <!-- Sidebar -->
+    <aside class="w-20 md:w-64 flex-shrink-0 glass border-r border-dark-border flex flex-col justify-between transition-all duration-300 z-20">
+        <div>
+            <div class="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-dark-border">
+                <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-indigo-600 shadow-lg shadow-brand-500/20">
+                    <i data-lucide="hexagon" class="text-white w-6 h-6"></i>
+                </div>
+                <h1 class="hidden md:block ml-3 text-xl font-bold tracking-wide">NEXUS <span class="text-[10px] text-brand-400 align-top">v1</span></h1>
+            </div>
+
+            <nav class="mt-8 px-3 space-y-2">
+                <button onclick="navTo('hub')" id="nav-hub" class="nav-btn w-full flex items-center p-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group active-nav">
+                    <i data-lucide="layout-grid" class="w-5 h-5 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block font-medium">App Hub</span>
+                </button>
+                <button onclick="navTo('deploy')" id="nav-deploy" class="nav-btn w-full flex items-center p-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                    <i data-lucide="rocket" class="w-5 h-5 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block font-medium">Deploy App</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-3 mb-4">
+            <button onclick="navTo('settings')" id="nav-settings" class="nav-btn w-full flex items-center p-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                <i data-lucide="settings" class="w-5 h-5 md:mr-3 group-hover:rotate-90 transition-transform duration-500"></i>
+                <span class="hidden md:block font-medium">Settings</span>
+            </button>
+            
+            <div id="userProfile" class="hidden md:flex mt-4 pt-4 border-t border-dark-border items-center px-3">
+                <div class="w-8 h-8 rounded-full bg-brand-900 flex items-center justify-center text-brand-400 font-bold text-sm" id="userInitial">U</div>
+                <div class="ml-3 truncate">
+                    <p class="text-sm font-medium text-white truncate" id="userNameDisplay">Not connected</p>
+                    <p class="text-xs text-brand-400 flex items-center truncate" id="activeProfileName">No profile</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative overflow-y-auto overflow-x-hidden scroll-smooth p-6 md:p-10 z-10">
+        
+        <!-- ==================== VIEW: APP HUB ==================== -->
+        <section id="view-hub" class="view-section active max-w-7xl mx-auto">
+            <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
+                <div>
+                    <h2 class="text-4xl font-bold text-white mb-2 tracking-tight">Ecosystem Radar</h2>
+                    <p class="text-gray-400 text-lg">Auto-discovering local services, VPS ports, and GitHub Pages.</p>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button onclick="startDiscovery()" id="btnScan" class="flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition-colors">
+                        <i data-lucide="radar" class="w-4 h-4"></i>
+                        <span>Rescan</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-4 mb-8">
+                <div class="glass p-4 rounded-2xl flex items-center gap-4">
+                    <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><i data-lucide="monitor" class="w-6 h-6"></i></div>
+                    <div>
+                        <p class="text-gray-400 text-sm">Local</p>
+                        <p class="text-2xl font-bold text-white" id="statLocal">0</p>
+                    </div>
+                </div>
+                <div class="glass p-4 rounded-2xl flex items-center gap-4">
+                    <div class="p-3 bg-purple-500/10 text-purple-400 rounded-xl"><i data-lucide="server" class="w-6 h-6"></i></div>
+                    <div>
+                        <p class="text-gray-400 text-sm">VPS</p>
+                        <p class="text-2xl font-bold text-white" id="statVps">0</p>
+                    </div>
+                </div>
+                <div class="glass p-4 rounded-2xl flex items-center gap-4">
+                    <div class="p-3 bg-brand-500/10 text-brand-400 rounded-xl"><i data-lucide="github" class="w-6 h-6"></i></div>
+                    <div>
+                        <p class="text-gray-400 text-sm">GitHub</p>
+                        <p class="text-2xl font-bold text-white" id="statGithub">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scanIndicator" class="hidden mb-8 p-4 glass rounded-xl border border-brand-500/30 flex items-center justify-center gap-3 text-brand-400">
+                <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+                <span class="font-medium tracking-wide animate-pulse">Scanning network & fetching repositories...</span>
+            </div>
+
+            <div id="appGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+
+            <div id="hubEmpty" class="hidden flex-col items-center justify-center py-24 text-center">
+                <div class="w-20 h-20 rounded-full glass flex items-center justify-center mb-6 text-gray-500">
+                    <i data-lucide="ghost" class="w-10 h-10"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">No applications found</h3>
+                <p class="text-gray-400 max-w-md">Try connecting your GitHub account in settings or adding a VPS IP.</p>
+                <button onclick="navTo('settings')" class="mt-6 text-brand-400 hover:text-brand-300 font-medium">Go to Settings &rarr;</button>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: DEPLOY WIZARD ==================== -->
+        <section id="view-deploy" class="view-section max-w-4xl mx-auto">
+            <div class="mb-10">
+                <h2 class="text-4xl font-bold text-white mb-2 tracking-tight">Deployment Wizard</h2>
+                <p class="text-gray-400 text-lg">Push folders to GitHub and activate Pages via a seamless process.</p>
+            </div>
+
+            <!-- Stepper -->
+            <div class="flex items-center justify-between mb-8 relative">
+                <div class="absolute top-1/2 left-0 w-full h-0.5 bg-gray-800 -z-10 -translate-y-1/2"></div>
+                
+                <div id="step-nav-1" class="step-item step-active flex flex-col items-center bg-[#050505] px-2">
+                    <div class="step-circle w-10 h-10 rounded-full border-2 border-gray-600 bg-dark-bg flex items-center justify-center mb-2">1</div>
+                    <span class="step-text text-sm text-gray-500">Repository</span>
+                </div>
+                <div id="step-nav-2" class="step-item flex flex-col items-center bg-[#050505] px-2">
+                    <div class="step-circle w-10 h-10 rounded-full border-2 border-gray-600 bg-dark-bg flex items-center justify-center mb-2">2</div>
+                    <span class="step-text text-sm text-gray-500">Source Files</span>
+                </div>
+                <div id="step-nav-3" class="step-item flex flex-col items-center bg-[#050505] px-2">
+                    <div class="step-circle w-10 h-10 rounded-full border-2 border-gray-600 bg-dark-bg flex items-center justify-center mb-2">3</div>
+                    <span class="step-text text-sm text-gray-500">Console</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 sm:p-8 rounded-2xl relative overflow-hidden min-h-[400px]">
+                
+                <!-- TAB 1: REPOSITORY -->
+                <div id="deploy-tab-1" class="deploy-tab active">
+                    <h3 class="text-2xl font-bold text-white mb-6">Select Destination</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <!-- Select Existing -->
+                        <div class="glass p-5 rounded-xl border border-dark-border hover:border-brand-500/50 transition-colors">
+                            <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Existing Repository</label>
+                            <div class="relative">
+                                <button id="repoSelectBtn" onclick="toggleRepoDropdown()" class="w-full flex items-center justify-between bg-black/40 border border-gray-700 px-4 py-3 rounded-lg text-sm text-left hover:border-brand-500 transition-colors">
+                                    <span id="repoSelectLabel" class="truncate text-gray-300">Select a repository...</span>
+                                    <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+                                </button>
+                                
+                                <div id="repoDropdown" class="hidden absolute top-full left-0 w-full mt-2 bg-[#111] border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden">
+                                    <div class="p-2 border-b border-gray-800">
+                                        <input type="text" id="repoSearch" placeholder="Search..." class="w-full bg-black/50 border border-gray-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-brand-500">
+                                    </div>
+                                    <ul id="repoList" class="max-h-48 overflow-y-auto text-sm text-gray-300"></ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Create New -->
+                        <div class="glass p-5 rounded-xl border border-dark-border hover:border-brand-500/50 transition-colors">
+                            <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Create New Repository</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="newRepoName" placeholder="my-awesome-app" class="flex-1 glass-input px-4 py-3 rounded-lg text-sm">
+                                <button onclick="createNewRepo()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-3 rounded-lg transition-colors shadow-lg shadow-brand-500/20">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <label class="flex items-center mt-4 text-sm text-gray-400 cursor-pointer w-max">
+                                <input type="checkbox" id="isPrivateRepo" class="mr-2 rounded bg-dark-bg border-gray-600 text-brand-500 focus:ring-brand-500" onchange="checkOverrides()">
+                                Private Repository
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Overrides -->
+                    <div class="bg-brand-900/10 border border-brand-500/20 rounded-xl p-5 mb-8">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-brand-400 font-medium flex items-center mb-1"><i data-lucide="settings-2" class="w-4 h-4 mr-2"></i> Deployment Overrides</h4>
+                                <p class="text-xs text-gray-400">Settings to ensure GitHub Pages compatibility.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="overrideEnforcePages" class="sr-only peer" checked onchange="checkOverrides()">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500"></div>
+                            </label>
+                        </div>
+                        <div id="overrideWarning" class="mt-3 text-xs text-brand-300/80 hidden">
+                            <i data-lucide="info" class="w-3 h-3 inline mr-1"></i> "Private" flag will be ignored for Pages compatibility.
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="gotoDeployStep(2)" id="btnNext1" disabled class="bg-white hover:bg-gray-200 disabled:bg-gray-700 disabled:text-gray-500 text-black px-6 py-3 rounded-xl font-bold transition-colors flex items-center">
+                            Next Step <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: SOURCE FOLDER -->
+                <div id="deploy-tab-2" class="deploy-tab hidden">
+                    <button onclick="gotoDeployStep(1)" class="text-gray-400 hover:text-white flex items-center text-sm mb-6"><i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Back</button>
+                    <h3 class="text-2xl font-bold text-white mb-6">Select Source Files</h3>
+                    
+                    <div class="border-2 border-dashed border-gray-600 hover:border-brand-400 rounded-xl p-10 text-center transition-colors cursor-pointer group mb-8" onclick="document.getElementById('folderInput').click()">
+                        <div class="w-20 h-20 mx-auto bg-white/5 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-500/20 transition-all duration-300 mb-4">
+                            <i data-lucide="folder-up" class="w-10 h-10 text-gray-400 group-hover:text-brand-400"></i>
+                        </div>
+                        <h4 class="text-xl font-medium text-white mb-2">Click to select folder</h4>
+                        <p class="text-sm text-gray-400">All contents will be pushed to the root of <span id="lblSelectedRepo" class="text-brand-400 font-mono"></span>.</p>
+                        <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(event)">
+                    </div>
+
+                    <div id="uploadInfo" class="hidden bg-gray-900 border border-gray-700 rounded-xl p-5 mb-8">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h5 class="text-brand-400 font-bold mb-1 text-lg" id="fileCountMsg">0 files ready</h5>
+                                <p class="text-sm text-gray-400" id="credMsg">Using global GitHub PAT.</p>
+                            </div>
+                            <button onclick="clearFiles()" class="text-gray-500 hover:text-red-400 p-2 bg-white/5 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+
+                        <div id="renameIndexDiv" class="hidden mt-4 pt-4 border-t border-gray-700">
+                            <p class="text-sm text-yellow-500 mb-3 flex items-center"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i> Pages override requires <code>index.html</code>. Rename a file?</p>
+                            <select id="htmlRenameSelect" class="w-full glass-input px-4 py-3 rounded-xl text-sm text-gray-300"></select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="startDeployment()" id="btnDeploy" disabled class="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:from-gray-700 disabled:to-gray-800 disabled:text-gray-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center">
+                            <i data-lucide="rocket" class="w-5 h-5 mr-2"></i> Deploy App
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 3: CONSOLE -->
+                <div id="deploy-tab-3" class="deploy-tab hidden">
+                    <h3 class="text-2xl font-bold text-white mb-6">Deployment Status</h3>
+                    
+                    <div class="terminal rounded-xl h-80 flex flex-col relative overflow-hidden mb-6">
+                        <div class="bg-[#1a1a1a] px-4 py-2 border-b border-[#333] flex items-center justify-between">
+                            <div class="flex gap-2"><div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div></div>
+                            <span class="text-[#888] text-xs font-mono">nexus_deploy.sh</span>
+                        </div>
+                        <div id="terminalOutput" class="flex-1 p-4 font-mono text-xs overflow-y-auto space-y-1"></div>
+                        <div id="progressContainer" class="hidden absolute bottom-0 left-0 w-full h-1 bg-gray-800">
+                            <div id="progressBar" class="h-full bg-brand-500 w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+
+                    <div id="deploySuccessPanel" class="hidden bg-emerald-900/20 border border-emerald-500/30 p-6 rounded-xl">
+                        <h4 class="text-emerald-400 font-bold text-lg flex items-center mb-4"><i data-lucide="check-circle" class="w-6 h-6 mr-2"></i> Mission Accomplished</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <a id="linkSuccessRepo" href="#" target="_blank" class="glass p-4 rounded-xl hover:border-emerald-500/50 transition-colors flex flex-col group">
+                                <span class="text-xs text-gray-500 uppercase mb-2">Repository</span>
+                                <span class="text-white font-medium flex items-center justify-between"><span class="truncate pr-2">github.com</span><i data-lucide="external-link" class="w-4 h-4 text-emerald-500 group-hover:scale-110"></i></span>
+                            </a>
+                            <div class="glass p-4 rounded-xl flex flex-col">
+                                <span class="text-xs text-gray-500 uppercase mb-2">Live App</span>
+                                <div id="pagesHeartbeat" class="flex items-center text-sm text-brand-300">
+                                    <span class="relative flex h-2 w-2 mr-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span></span>
+                                    Building Pages...
+                                </div>
+                                <a id="linkSuccessPages" href="#" target="_blank" class="hidden text-brand-400 hover:text-brand-300 font-medium flex items-center justify-between group">
+                                    <span class="truncate pr-2">Visit App</span><i data-lucide="external-link" class="w-4 h-4 group-hover:scale-110"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-center">
+                            <button onclick="resetWizard()" class="text-gray-400 hover:text-white underline text-sm">Deploy another folder</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: SETTINGS ==================== -->
+        <section id="view-settings" class="view-section max-w-4xl mx-auto">
+            <div class="mb-10">
+                <h2 class="text-4xl font-bold text-white mb-2 tracking-tight">System Configuration</h2>
+                <p class="text-gray-400 text-lg">Manage your profiles, keys, and network settings.</p>
+            </div>
+
+            <!-- GitHub Profiles -->
+            <div class="mb-10">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-white flex items-center"><i data-lucide="github" class="w-6 h-6 mr-3 text-gray-400"></i> GitHub PAT Profiles</h3>
+                    <button onclick="toggleModal('ghModal')" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center"><i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add Profile</button>
+                </div>
+                <div id="ghProfilesList" class="space-y-3">
+                    <!-- Rendered via JS -->
+                </div>
+                <div id="ghProfilesEmpty" class="hidden text-center p-8 glass rounded-2xl border border-dashed border-gray-600">
+                    <p class="text-gray-500">No GitHub profiles found. Add one to start deploying.</p>
+                </div>
+            </div>
+
+            <!-- Webhooks -->
+            <div class="mb-10">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-white flex items-center"><i data-lucide="bell" class="w-6 h-6 mr-3 text-indigo-400"></i> Notification Webhooks</h3>
+                    <button onclick="toggleModal('whModal')" class="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center"><i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add Webhook</button>
+                </div>
+                <div id="webhooksList" class="space-y-3">
+                    <!-- Rendered via JS -->
+                </div>
+                <div id="webhooksEmpty" class="hidden text-center p-8 glass rounded-2xl border border-dashed border-indigo-900/50">
+                    <p class="text-indigo-400/50">No webhooks configured.</p>
+                </div>
+            </div>
+
+            <!-- Network Settings -->
+            <div>
+                <h3 class="text-xl font-bold text-white flex items-center mb-4"><i data-lucide="network" class="w-6 h-6 mr-3 text-emerald-400"></i> Network Scope</h3>
+                <div class="glass-panel p-6 rounded-2xl">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">VPS IP Address / Hostname (for App Hub discovery)</label>
+                    <div class="flex gap-3">
+                        <input type="text" id="inputVps" placeholder="e.g. 192.168.1.50" class="flex-1 glass-input px-4 py-3 rounded-xl text-sm max-w-md">
+                        <button onclick="saveNetwork()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-medium transition-colors">Save</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="ghModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-md p-6 rounded-2xl border border-gray-700">
+            <h3 class="text-xl font-bold text-white mb-4">Add GitHub Profile</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Profile Name</label>
+                    <input type="text" id="newGhName" placeholder="e.g. Work Account" class="w-full glass-input px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Personal Access Token</label>
+                    <input type="password" id="newGhToken" placeholder="ghp_..." class="w-full glass-input px-3 py-2 rounded-lg text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">GitHub Username (Optional)</label>
+                    <input type="text" id="newGhUsername" placeholder="e.g. octocat" class="w-full glass-input px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button onclick="toggleModal('ghModal')" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                    <button onclick="addGhProfile()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-medium">Save Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="whModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-md p-6 rounded-2xl border border-gray-700">
+            <h3 class="text-xl font-bold text-white mb-4">Add Webhook</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Webhook Name</label>
+                    <input type="text" id="newWhName" placeholder="e.g. Team Discord" class="w-full glass-input px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Platform</label>
+                    <select id="newWhType" class="w-full glass-input px-3 py-2 rounded-lg text-sm bg-dark-bg">
+                        <option value="discord">Discord</option>
+                        <option value="slack">Slack</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">URL</label>
+                    <input type="url" id="newWhUrl" placeholder="https://..." class="w-full glass-input px-3 py-2 rounded-lg text-sm">
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button onclick="toggleModal('whModal')" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                    <button onclick="addWebhook()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium">Save Webhook</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+    <script>
+        lucide.createIcons();
+
+        const API_BASE = 'https://api.github.com';
+        const COMMON_PORTS = [3000, 5173, 8000, 8080, 4200, 3001, 5000];
+        
+        let state = {
+            ghProfiles: JSON.parse(localStorage.getItem('nexus_gh_profiles') || '[]'),
+            webhooks: JSON.parse(localStorage.getItem('nexus_webhooks') || '[]'),
+            vpsIp: localStorage.getItem('nexus_vps') || '',
+            activePat: null,
+            username: '',
+            
+            // App Hub
+            discoveredApps: [],
+            
+            // Deploy Wizard
+            deployStep: 1,
+            repos: [],
+            selectedRepoName: null,
+            uploadFiles: [],
+            uploadToken: ''
+        };
+
+        window.onload = () => {
+            document.getElementById('inputVps').value = state.vpsIp;
+            
+            checkActiveProfile();
+            renderSettingsManagers();
+
+            if (state.activePat && state.username) {
+                navTo('hub');
+                startDiscovery();
+            } else {
+                navTo('settings');
+            }
+
+            document.getElementById('repoSearch').addEventListener('input', filterRepoList);
+
+            document.addEventListener('click', (e) => {
+                const drop = document.getElementById('repoDropdown');
+                const btn = document.getElementById('repoSelectBtn');
+                if (drop && btn && !drop.classList.contains('hidden') && !drop.contains(e.target) && !btn.contains(e.target)) {
+                    drop.classList.add('hidden');
+                }
+            });
+        };
+
+        // ---------------- NAVIGATION & UI ----------------
+        function navTo(viewId) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white/10', 'text-white');
+                btn.classList.add('text-gray-400');
+            });
+            const activeBtn = document.getElementById(`nav-${viewId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-gray-400');
+                activeBtn.classList.add('bg-white/10', 'text-white');
+            }
+
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(`view-${viewId}`).classList.add('active');
+
+            if (viewId === 'deploy' && state.activePat && state.repos.length === 0) fetchRepositories();
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            let colorCls = 'bg-gray-800 border-gray-700 text-white', icon = 'info';
+            if(type === 'success') { colorCls = 'bg-emerald-900/90 border-emerald-500/50 text-emerald-100'; icon = 'check-circle'; }
+            if(type === 'error') { colorCls = 'bg-red-900/90 border-red-500/50 text-red-100'; icon = 'x-circle'; }
+            if(type === 'warn') { colorCls = 'bg-yellow-900/90 border-yellow-500/50 text-yellow-100'; icon = 'alert-triangle'; }
+
+            toast.className = `toast-enter flex items-center p-4 border rounded-xl shadow-2xl backdrop-blur-md ${colorCls} max-w-sm`;
+            toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 mr-3 flex-shrink-0"></i><p class="text-sm font-medium">${message}</p>`;
+            container.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => { toast.classList.replace('toast-enter', 'toast-exit'); setTimeout(() => toast.remove(), 300); }, 4000);
+        }
+
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.toggle('hidden');
+            if(!modal.classList.contains('hidden')){
+                if(id==='ghModal') { document.getElementById('newGhName').value=''; document.getElementById('newGhToken').value=''; document.getElementById('newGhUsername').value=''; }
+                if(id==='whModal') { document.getElementById('newWhName').value=''; document.getElementById('newWhUrl').value=''; }
+            }
+        }
+
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
+        function maskToken(token) { return token ? token.substring(0, 4) + '••••••••' + token.slice(-4) : ''; }
+
+        // ---------------- SETTINGS MANAGERS ----------------
+        function checkActiveProfile() {
+            const active = state.ghProfiles.find(p => p.active);
+            if (active) {
+                state.activePat = active.token;
+                state.username = active.username || '';
+                updateUserUI(true, active.name, state.username);
+                if(!state.username) pingPat(active.id, true); // fetch username if missing
+            } else {
+                state.activePat = null; state.username = '';
+                updateUserUI(false);
+            }
+        }
+
+        function updateUserUI(isConnected, profileName, username) {
+            const profile = document.getElementById('userProfile');
+            if (isConnected) {
+                profile.classList.remove('hidden');
+                document.getElementById('userNameDisplay').textContent = username || 'Connecting...';
+                document.getElementById('userInitial').textContent = username ? username.charAt(0).toUpperCase() : '?';
+                document.getElementById('activeProfileName').textContent = `Profile: ${profileName}`;
+            } else {
+                profile.classList.add('hidden');
+            }
+        }
+
+        function renderSettingsManagers() {
+            // GH Profiles
+            const ghList = document.getElementById('ghProfilesList');
+            const ghEmpty = document.getElementById('ghProfilesEmpty');
+            if (state.ghProfiles.length === 0) {
+                ghList.innerHTML = ''; ghEmpty.classList.remove('hidden');
+            } else {
+                ghEmpty.classList.add('hidden');
+                ghList.innerHTML = state.ghProfiles.map(p => `
+                    <div class="glass p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between border ${p.active ? 'border-brand-500 bg-brand-500/5' : 'border-gray-800 hover:border-gray-600'} transition-colors">
+                        <div class="mb-3 sm:mb-0">
+                            <div class="flex items-center">
+                                <span class="font-bold text-white mr-3">${p.name}</span>
+                                ${p.active ? '<span class="text-[10px] bg-brand-500 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>' : ''}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1 font-mono">${maskToken(p.token)} ${p.username ? `(@${p.username})` : ''}</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="setPatActive('${p.id}')" title="Set Active" class="w-9 h-9 rounded-lg ${p.active ? 'bg-brand-500 text-white cursor-default' : 'bg-white/5 text-gray-400 hover:bg-brand-500/20 hover:text-brand-400'} flex items-center justify-center transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                            <button onclick="pingPat('${p.id}')" title="Test Connection" class="w-9 h-9 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"><i data-lucide="heart" class="w-4 h-4"></i></button>
+                            <button onclick="deletePat('${p.id}')" title="Delete" class="w-9 h-9 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Webhooks
+            const whList = document.getElementById('webhooksList');
+            const whEmpty = document.getElementById('webhooksEmpty');
+            if (state.webhooks.length === 0) {
+                whList.innerHTML = ''; whEmpty.classList.remove('hidden');
+            } else {
+                whEmpty.classList.add('hidden');
+                whList.innerHTML = state.webhooks.map(w => `
+                    <div class="glass p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between border ${w.active ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-gray-800'} transition-colors">
+                        <div class="mb-3 sm:mb-0">
+                            <div class="flex items-center">
+                                <span class="font-bold text-white mr-3">${w.name}</span>
+                                <span class="text-xs text-gray-400 capitalize px-2 py-0.5 rounded bg-white/5 border border-white/10 flex items-center"><i data-lucide="${w.type === 'discord' ? 'message-square' : 'hash'}" class="w-3 h-3 mr-1"></i>${w.type}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1 truncate max-w-[200px] sm:max-w-xs">${w.url}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="relative inline-flex items-center cursor-pointer mr-2">
+                                <input type="checkbox" class="sr-only peer" ${w.active ? 'checked' : ''} onchange="toggleWebhook('${w.id}')">
+                                <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                            </label>
+                            <button onclick="pingWebhook('${w.id}')" title="Send Test" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"><i data-lucide="send" class="w-3 h-3"></i></button>
+                            <button onclick="deleteWebhook('${w.id}')" title="Delete" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            lucide.createIcons();
+            
+            // Save state
+            localStorage.setItem('nexus_gh_profiles', JSON.stringify(state.ghProfiles));
+            localStorage.setItem('nexus_webhooks', JSON.stringify(state.webhooks));
+        }
+
+        // PAT Actions
+        function addGhProfile() {
+            const name = document.getElementById('newGhName').value.trim();
+            const token = document.getElementById('newGhToken').value.trim();
+            const username = document.getElementById('newGhUsername').value.trim() || null;
+            if(!name || !token) { showToast('Name and Token required', 'warn'); return; }
+            
+            const isFirst = state.ghProfiles.length === 0;
+            state.ghProfiles.push({ id: generateId(), name, token, active: isFirst, username: username });
+            toggleModal('ghModal');
+            renderSettingsManagers();
+            if(isFirst) checkActiveProfile();
+            showToast('Profile saved', 'success');
+        }
+
+        function setPatActive(id) {
+            state.ghProfiles.forEach(p => p.active = (p.id === id));
+            renderSettingsManagers();
+            checkActiveProfile();
+            // Reset repos as auth changed
+            state.repos = [];
+            document.getElementById('repoSelectLabel').innerHTML = `<span class="truncate text-gray-300">Select a repository...</span>`;
+        }
+
+        function deletePat(id) {
+            state.ghProfiles = state.ghProfiles.filter(p => p.id !== id);
+            if(state.ghProfiles.length > 0 && !state.ghProfiles.find(p=>p.active)) state.ghProfiles[0].active = true;
+            renderSettingsManagers();
+            checkActiveProfile();
+        }
+
+        async function pingPat(id, silent = false) {
+            const p = state.ghProfiles.find(p => p.id === id);
+            if(!p) return;
+            try {
+                const res = await fetch(`${API_BASE}/user`, { headers: { 'Authorization': `token ${p.token}` } });
+                if(!res.ok) throw new Error('Invalid token');
+                const data = await res.json();
+                p.username = data.login;
+                renderSettingsManagers();
+                if(p.active) checkActiveProfile();
+                if(!silent) showToast(`Valid connection for @${data.login}`, 'success');
+            } catch(e) {
+                if(!silent) showToast(`Connection failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Webhook Actions
+        function addWebhook() {
+            const name = document.getElementById('newWhName').value.trim();
+            const type = document.getElementById('newWhType').value;
+            const url = document.getElementById('newWhUrl').value.trim();
+            if(!name || !url) { showToast('Name and URL required', 'warn'); return; }
+            
+            state.webhooks.push({ id: generateId(), name, type, url, active: true });
+            toggleModal('whModal');
+            renderSettingsManagers();
+            showToast('Webhook added', 'success');
+        }
+
+        function toggleWebhook(id) {
+            const w = state.webhooks.find(w => w.id === id);
+            if(w) { w.active = !w.active; renderSettingsManagers(); }
+        }
+
+        function deleteWebhook(id) {
+            state.webhooks = state.webhooks.filter(w => w.id !== id);
+            renderSettingsManagers();
+        }
+
+        async function pingWebhook(id) {
+            const w = state.webhooks.find(w => w.id === id);
+            if(!w) return;
+            try {
+                const payload = w.type === 'discord' ? { content: "🟢 Nexus: Webhook test successful." } : { text: "🟢 Nexus: Webhook test successful." };
+                await fetch(w.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                showToast(`Test message sent to ${w.name}`, 'success');
+            } catch(e) {
+                showToast(`Failed to reach webhook: ${e.message}`, 'error');
+            }
+        }
+
+        async function triggerActiveWebhooks(message) {
+            const active = state.webhooks.filter(w => w.active);
+            for(let w of active) {
+                try {
+                    const payload = w.type === 'discord' ? { content: message } : { text: message };
+                    await fetch(w.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                } catch(e){}
+            }
+        }
+
+        function saveNetwork() {
+            state.vpsIp = document.getElementById('inputVps').value.trim();
+            localStorage.setItem('nexus_vps', state.vpsIp);
+            showToast('Network settings saved', 'success');
+        }
+
+        // ---------------- HUB DISCOVERY ----------------
+        // (Unchanged logic, just ensure styling remains consistent)
+        async function startDiscovery() {
+            if (!state.activePat) { showToast("Select an active GitHub profile first", "warn"); return; }
+            
+            const btn = document.getElementById('btnScan');
+            const indicator = document.getElementById('scanIndicator');
+            
+            btn.disabled = true; btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>`;
+            lucide.createIcons();
+            indicator.classList.remove('hidden');
+            
+            state.discoveredApps = [];
+            document.getElementById('statLocal').textContent = '0';
+            document.getElementById('statVps').textContent = '0';
+            document.getElementById('statGithub').textContent = '0';
+
+            const promises = [];
+            COMMON_PORTS.forEach(port => promises.push(checkService(`http://localhost:${port}`, 'Local', 'monitor', 'emerald')));
+            if (state.vpsIp) {
+                promises.push(checkService(`http://${state.vpsIp}`, 'VPS', 'server', 'purple'));
+                COMMON_PORTS.forEach(port => promises.push(checkService(`http://${state.vpsIp}:${port}`, 'VPS', 'server', 'purple')));
+            }
+            promises.push(fetchGithubPages());
+
+            await Promise.allSettled(promises);
+
+            indicator.classList.add('hidden');
+            btn.disabled = false; btn.innerHTML = `<i data-lucide="radar" class="w-4 h-4"></i><span>Rescan</span>`;
+            lucide.createIcons();
+            renderAppGrid();
+        }
+
+        async function checkService(url, category, icon, colorTheme) {
+            try {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 1500);
+                await fetch(url, { mode: 'no-cors', signal: controller.signal });
+                clearTimeout(id);
+                addDiscoveredApp({ title: `${category} :${url.split(':').pop()}`, desc: `Active service responding at ${url}`, url: url, category: category, icon: icon, colorTheme: colorTheme });
+            } catch(e) {}
+        }
+
+        async function fetchGithubPages() {
+            try {
+                const res = await fetch(`${API_BASE}/user/repos?per_page=100&sort=updated`, { headers: { 'Authorization': `token ${state.activePat}` } });
+                if(!res.ok) return;
+                const repos = await res.json();
+                repos.forEach(repo => {
+                    if (repo.has_pages) {
+                        addDiscoveredApp({ title: repo.name, desc: repo.description || 'GitHub Pages Deployment', url: `https://${state.username}.github.io/${repo.name}`, category: 'GitHub Pages', icon: 'globe', colorTheme: 'brand' });
+                    }
+                });
+            } catch(e) {}
+        }
+
+        function addDiscoveredApp(app) {
+            if (!state.discoveredApps.some(a => a.url === app.url)) {
+                state.discoveredApps.push(app);
+                const statId = app.category === 'Local' ? 'statLocal' : (app.category === 'VPS' ? 'statVps' : 'statGithub');
+                const el = document.getElementById(statId);
+                el.textContent = parseInt(el.textContent) + 1;
+            }
+        }
+
+        function renderAppGrid() {
+            const grid = document.getElementById('appGrid');
+            const empty = document.getElementById('hubEmpty');
+            let filtered = state.discoveredApps;
+
+            if (filtered.length === 0) {
+                grid.innerHTML = ''; empty.classList.remove('hidden'); empty.classList.add('flex');
+            } else {
+                empty.classList.add('hidden'); empty.classList.remove('flex');
+                grid.innerHTML = filtered.map(app => {
+                    let bgCol = app.colorTheme === 'brand' ? 'bg-brand-500/10 text-brand-400 border-brand-500/20' : (app.colorTheme === 'emerald' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20');
+                    let hoverCol = app.colorTheme === 'brand' ? 'group-hover:text-brand-400' : (app.colorTheme === 'emerald' ? 'group-hover:text-emerald-400' : 'group-hover:text-purple-400');
+                    return `
+                    <div class="glass card-hover rounded-2xl p-5 flex flex-col h-full group relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2.5 rounded-xl border ${bgCol}"><i data-lucide="${app.icon}" class="w-5 h-5"></i></div>
+                            <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-white/5 text-gray-400 border border-white/10">${app.category}</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-1.5 ${hoverCol} transition-colors truncate">${app.title}</h3>
+                        <p class="text-gray-400 text-sm mb-6 flex-grow line-clamp-2">${app.desc}</p>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="${app.url}" target="_blank" class="flex-1 bg-white/10 hover:bg-white/20 text-white text-sm font-medium py-2 rounded-lg flex items-center justify-center transition-colors">Launch <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1.5"></i></a>
+                            <button onclick="navigator.clipboard.writeText('${app.url}'); showToast('URL copied!', 'success');" class="bg-white/5 hover:bg-white/10 text-gray-400 p-2 rounded-lg transition-colors" title="Copy URL"><i data-lucide="copy" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+                lucide.createIcons();
+            }
+        }
+
+        // ---------------- DEPLOY WIZARD ----------------
+        function gotoDeployStep(step) {
+            state.deployStep = step;
+            
+            // Update UI Steps
+            [1, 2, 3].forEach(i => {
+                const nav = document.getElementById(`step-nav-${i}`);
+                const tab = document.getElementById(`deploy-tab-${i}`);
+                
+                nav.classList.remove('step-active', 'step-completed');
+                if(i < step) nav.classList.add('step-completed');
+                else if(i === step) nav.classList.add('step-active');
+                
+                if(i === step) {
+                    tab.classList.remove('hidden');
+                    // Small delay to trigger animation
+                    setTimeout(() => tab.classList.add('active'), 10);
+                } else {
+                    tab.classList.remove('active');
+                    tab.classList.add('hidden');
+                }
+            });
+            
+            if(step === 2) {
+                document.getElementById('lblSelectedRepo').textContent = state.selectedRepoName;
+            }
+        }
+
+        function resetWizard() {
+            clearFiles();
+            gotoDeployStep(1);
+            document.getElementById('deploySuccessPanel').classList.add('hidden');
+            document.getElementById('terminalOutput').innerHTML = '<div class="text-gray-500">> System ready. Waiting for instructions...</div>';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressContainer').classList.add('hidden');
+        }
+
+        function checkOverrides() {
+            const enforce = document.getElementById('overrideEnforcePages').checked;
+            state.enforcePages = enforce;
+            const isPrivate = document.getElementById('isPrivateRepo');
+            const warn = document.getElementById('overrideWarning');
+            
+            if (enforce && isPrivate.checked) {
+                warn.classList.remove('hidden');
+                isPrivate.checked = false; // Force unchecked if enforce is on
+            } else {
+                warn.classList.add('hidden');
+            }
+        }
+
+        function toggleRepoDropdown() { document.getElementById('repoDropdown').classList.toggle('hidden'); }
+
+        async function fetchRepositories() {
+            if (!state.activePat) return;
+            try {
+                const res = await fetch(`${API_BASE}/user/repos?per_page=100&sort=updated`, { headers: { 'Authorization': `token ${state.activePat}` } });
+                if (res.ok) { state.repos = await res.json(); filterRepoList(); }
+            } catch(e) {}
+        }
+
+        function filterRepoList() {
+            const list = document.getElementById('repoList');
+            const search = document.getElementById('repoSearch')?.value.toLowerCase() || '';
+            const filtered = state.repos.filter(r => r.name.toLowerCase().includes(search));
+            
+            list.innerHTML = filtered.map(repo => `
+                <li onclick="selectRepo('${repo.name}')" class="px-4 py-2.5 hover:bg-brand-600/20 cursor-pointer border-b border-gray-800 last:border-0 flex justify-between items-center transition-colors">
+                    <span class="font-medium">${repo.name}</span>
+                    <span class="text-[10px] uppercase px-1.5 py-0.5 rounded ${repo.private ? 'bg-gray-800 text-gray-400' : 'bg-brand-900/40 text-brand-400'}">${repo.private ? 'Private' : 'Public'}</span>
+                </li>
+            `).join('');
+            if(filtered.length === 0) list.innerHTML = `<li class="px-4 py-3 text-center text-gray-500">No repositories found</li>`;
+        }
+
+        function selectRepo(name) {
+            state.selectedRepoName = name;
+            document.getElementById('repoSelectLabel').innerHTML = `<span class="text-white font-medium">${name}</span>`;
+            toggleRepoDropdown();
+            validateStep1();
+        }
+
+        async function createNewRepo() {
+            const name = document.getElementById('newRepoName').value.trim();
+            const isPrivate = document.getElementById('isPrivateRepo').checked;
+            if(!name) { showToast('Enter a repository name', 'warn'); return; }
+
+            try {
+                const res = await fetch(`${API_BASE}/user/repos`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `token ${state.activePat}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, private: isPrivate, auto_init: true })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+
+                showToast(`Repository ${name} created`, 'success');
+                await fetchRepositories();
+                selectRepo(name);
+                document.getElementById('newRepoName').value = '';
+                triggerActiveWebhooks(`📁 **New Repository Created**\n\n**User:** ${state.username}\n**Name:** ${name}\n**Visibility:** ${isPrivate ? 'Private' : 'Public'}\n**URL:** ${data.html_url}`);
+
+            } catch(e) { showToast(e.message, 'error'); }
+        }
+
+        function validateStep1() {
+            document.getElementById('btnNext1').disabled = !state.selectedRepoName;
+        }
+
+        async function handleFolderSelect(event) {
+            const files = Array.from(event.target.files);
+            if(files.length === 0) return;
+
+            state.uploadFiles = files;
+            state.uploadToken = state.activePat;
+            
+            const infoDiv = document.getElementById('uploadInfo');
+            const renameDiv = document.getElementById('renameIndexDiv');
+            const renameSelect = document.getElementById('htmlRenameSelect');
+            
+            infoDiv.classList.remove('hidden');
+            renameDiv.classList.add('hidden');
+            renameSelect.innerHTML = '';
+
+            const credIdx = state.uploadFiles.findIndex(f => f.name === 'credentials.json');
+            let msg = `${files.length} files ready to launch.`;
+            
+            if (credIdx !== -1) {
+                try {
+                    const text = await state.uploadFiles[credIdx].text();
+                    const json = JSON.parse(text);
+                    if (json.token || json.PAT || json.github_token) {
+                        state.uploadToken = json.token || json.PAT || json.github_token;
+                        document.getElementById('credMsg').innerHTML = `<span class="text-brand-400">credentials.json</span> overrides global PAT.`;
+                    }
+                    state.uploadFiles.splice(credIdx, 1);
+                    msg = `${state.uploadFiles.length} files ready to launch.`;
+                } catch(e) {}
+            } else {
+                document.getElementById('credMsg').textContent = `Using active GitHub Profile.`;
+            }
+            
+            document.getElementById('fileCountMsg').textContent = msg;
+
+            // Enforce pages logic
+            let hasIndex = false;
+            let htmlFiles = [];
+            state.uploadFiles.forEach(f => {
+                const p = f.webkitRelativePath.split('/').slice(1).join('/');
+                if(p.toLowerCase() === 'index.html') hasIndex = true;
+                if(p.toLowerCase().endsWith('.html')) htmlFiles.push(p);
+            });
+
+            if(state.enforcePages && !hasIndex && htmlFiles.length > 0) {
+                renameDiv.classList.remove('hidden');
+                renameSelect.innerHTML = `<option value="">-- Continue without renaming --</option>` + htmlFiles.map(h => `<option value="${h}">${h}</option>`).join('');
+            }
+
+            document.getElementById('btnDeploy').disabled = false;
+        }
+
+        function clearFiles() {
+            state.uploadFiles = [];
+            document.getElementById('uploadInfo').classList.add('hidden');
+            document.getElementById('folderInput').value = '';
+            document.getElementById('btnDeploy').disabled = true;
+        }
+
+        const fileToBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader(); reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = e => reject(e);
+        });
+
+        function terminalLog(msg, type = 'info') {
+            const term = document.getElementById('terminalOutput');
+            const div = document.createElement('div');
+            let color = 'text-gray-300';
+            if (type === 'success') color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warn') color = 'text-yellow-400';
+            if (type === 'system') color = 'text-brand-400';
+            div.className = color;
+            div.innerHTML = `<span class="text-gray-600">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+            term.appendChild(div);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        async function startDeployment() {
+            if(!state.selectedRepoName || state.uploadFiles.length === 0) return;
+            gotoDeployStep(3);
+
+            const progContainer = document.getElementById('progressContainer');
+            const progBar = document.getElementById('progressBar');
+            progContainer.classList.remove('hidden');
+            progBar.style.width = '0%';
+
+            const repo = state.selectedRepoName;
+            const renameSelect = document.getElementById('htmlRenameSelect');
+            const fileToRename = (renameSelect && !renameSelect.parentElement.classList.contains('hidden')) ? renameSelect.value : null;
+
+            terminalLog('====================================', 'system');
+            terminalLog(`INITIATING DEPLOYMENT TO: ${state.username}/${repo}`, 'system');
+
+            let success = 0, errs = 0;
+            const total = state.uploadFiles.length;
+
+            for (let i = 0; i < total; i++) {
+                const file = state.uploadFiles[i];
+                const parts = file.webkitRelativePath.split('/');
+                parts.shift();
+                let path = parts.join('/');
+                if(!path) continue;
+
+                let msg = `Deploy ${path} via Nexus`;
+                if(fileToRename && path === fileToRename) {
+                    terminalLog(`Transforming ${path} -> index.html`, 'info');
+                    path = 'index.html';
+                    msg += ' (Renamed to index.html)';
+                }
+
+                try {
+                    const b64 = await fileToBase64(file);
+                    let body = { message: msg, content: b64 };
+
+                    let res = await fetch(`${API_BASE}/repos/${state.username}/${repo}/contents/${path}`, {
+                        method: 'PUT', headers: { 'Authorization': `token ${state.uploadToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    });
+
+                    if (res.status === 422) {
+                        const getRes = await fetch(`${API_BASE}/repos/${state.username}/${repo}/contents/${path}`, { headers: { 'Authorization': `token ${state.uploadToken}` } });
+                        if(getRes.ok) {
+                            body.sha = (await getRes.json()).sha;
+                            res = await fetch(`${API_BASE}/repos/${state.username}/${repo}/contents/${path}`, {
+                                method: 'PUT', headers: { 'Authorization': `token ${state.uploadToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                            });
+                        }
+                    }
+
+                    if(!res.ok) throw new Error((await res.json()).message);
+                    success++; terminalLog(`[SUCCESS] -> /${path}`, 'success');
+
+                } catch(e) { errs++; terminalLog(`[ERROR] -> /${path}: ${e.message}`, 'error'); }
+
+                progBar.style.width = `${Math.round(((i+1)/total)*100)}%`;
+            }
+
+            terminalLog(`UPLOAD COMPLETE. Success: ${success}, Errors: ${errs}`, success > 0 ? 'system' : 'error');
+
+            if (state.enforcePages) {
+                terminalLog(`Enabling GitHub Pages engine...`, 'system');
+                try {
+                    const rRes = await fetch(`${API_BASE}/repos/${state.username}/${repo}`, { headers: { 'Authorization': `token ${state.uploadToken}` }});
+                    const rData = await rRes.json();
+                    const branch = rData.default_branch || 'main';
+
+                    const pRes = await fetch(`${API_BASE}/repos/${state.username}/${repo}/pages`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `token ${state.uploadToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source: { branch: branch, path: '/' }})
+                    });
+
+                    if (pRes.status === 201) terminalLog(`Pages enabled on branch: ${branch}`, 'success');
+                    else if (pRes.status === 409) terminalLog(`Pages already active`, 'info');
+                    else terminalLog(`Pages activation status: ${pRes.status}. Ensure repo is public.`, 'warn');
+                } catch(e) { terminalLog(`Pages API error: ${e.message}`, 'warn'); }
+            }
+
+            setTimeout(() => progContainer.classList.add('hidden'), 1000);
+            showSuccessPanel(repo);
+
+            const repoUrl = `https://github.com/${state.username}/${repo}`;
+            const pagesUrl = `https://${state.username}.github.io/${repo}/`;
+            triggerActiveWebhooks(`🚀 **Nexus Deployment Successful**\n\nUser **${state.username}** pushed ${success} files to **${repo}**.\n\n📁 Repo: ${repoUrl}\n🌐 WebApp: ${pagesUrl}`);
+        }
+
+        function showSuccessPanel(repo) {
+            const panel = document.getElementById('deploySuccessPanel');
+            const repoUrl = `https://github.com/${state.username}/${repo}`;
+            const pagesUrl = `https://${state.username}.github.io/${repo}/`;
+
+            document.getElementById('linkSuccessRepo').href = repoUrl;
+            
+            const pagesLink = document.getElementById('linkSuccessPages');
+            pagesLink.href = pagesUrl;
+            pagesLink.classList.add('hidden');
+
+            const hb = document.getElementById('pagesHeartbeat');
+            
+            if(state.enforcePages) {
+                hb.classList.remove('hidden');
+                hb.innerHTML = `<span class="relative flex h-2 w-2 mr-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span></span> Building Pages...`;
+            } else {
+                hb.classList.add('hidden');
+                pagesLink.classList.remove('hidden');
+                pagesLink.classList.add('flex');
+            }
+
+            panel.classList.remove('hidden');
+
+            if(state.enforcePages) {
+                let attempts = 0;
+                const check = async () => {
+                    attempts++;
+                    try {
+                        const res = await fetch(pagesUrl + '?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+                        if (res.status === 200 || res.status === 304) {
+                            hb.classList.add('hidden'); pagesLink.classList.remove('hidden'); pagesLink.classList.add('flex'); return;
+                        }
+                    } catch(e) {}
+                    if (attempts < 40) setTimeout(check, 5000);
+                    else {
+                        hb.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3 mr-1 text-yellow-500"></i> Taking longer. Check manually.`;
+                        pagesLink.classList.remove('hidden'); pagesLink.classList.add('flex'); lucide.createIcons();
+                    }
+                };
+                setTimeout(check, 8000);
+            }
+        }
+    </script>
+</body>
+</html>
