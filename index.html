@@ -167,10 +167,6 @@
                     <p class="text-gray-400 text-lg">Auto-discovering local services, VPS ports, and GitHub Pages.</p>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <div class="relative glass rounded-xl">
-                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
-                        <input type="text" id="hubSearch" autocomplete="off" placeholder="Filter apps..." class="bg-transparent text-white pl-10 pr-4 py-2.5 rounded-xl outline-none w-full sm:w-64 focus:ring-1 focus:ring-brand-500 transition-shadow">
-                    </div>
                     <button onclick="startDiscovery()" id="btnScan" class="flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition-colors">
                         <i data-lucide="radar" class="w-4 h-4"></i>
                         <span>Rescan</span>
@@ -450,6 +446,10 @@
                     <label class="block text-xs text-gray-400 mb-1">Personal Access Token</label>
                     <input type="password" id="newGhToken" placeholder="ghp_..." class="w-full glass-input px-3 py-2 rounded-lg text-sm font-mono">
                 </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">GitHub Username (Optional)</label>
+                    <input type="text" id="newGhUsername" placeholder="e.g. octocat" class="w-full glass-input px-3 py-2 rounded-lg text-sm">
+                </div>
                 <div class="flex justify-end gap-3 mt-6">
                     <button onclick="toggleModal('ghModal')" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
                     <button onclick="addGhProfile()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-medium">Save Profile</button>
@@ -513,9 +513,6 @@
         };
 
         window.onload = () => {
-            // Fix AppHub autocomplete bug
-            document.getElementById('hubSearch').value = '';
-            
             document.getElementById('inputVps').value = state.vpsIp;
             
             checkActiveProfile();
@@ -528,7 +525,6 @@
                 navTo('settings');
             }
 
-            document.getElementById('hubSearch').addEventListener('input', renderAppGrid);
             document.getElementById('repoSearch').addEventListener('input', filterRepoList);
 
             document.addEventListener('click', (e) => {
@@ -577,7 +573,7 @@
             const modal = document.getElementById(id);
             modal.classList.toggle('hidden');
             if(!modal.classList.contains('hidden')){
-                if(id==='ghModal') { document.getElementById('newGhName').value=''; document.getElementById('newGhToken').value=''; }
+                if(id==='ghModal') { document.getElementById('newGhName').value=''; document.getElementById('newGhToken').value=''; document.getElementById('newGhUsername').value=''; }
                 if(id==='whModal') { document.getElementById('newWhName').value=''; document.getElementById('newWhUrl').value=''; }
             }
         }
@@ -653,7 +649,7 @@
                             </div>
                             <div class="text-xs text-gray-500 mt-1 truncate max-w-[200px] sm:max-w-xs">${w.url}</div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex items-center gap-2">
                             <label class="relative inline-flex items-center cursor-pointer mr-2">
                                 <input type="checkbox" class="sr-only peer" ${w.active ? 'checked' : ''} onchange="toggleWebhook('${w.id}')">
                                 <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -675,10 +671,11 @@
         function addGhProfile() {
             const name = document.getElementById('newGhName').value.trim();
             const token = document.getElementById('newGhToken').value.trim();
+            const username = document.getElementById('newGhUsername').value.trim() || null;
             if(!name || !token) { showToast('Name and Token required', 'warn'); return; }
             
             const isFirst = state.ghProfiles.length === 0;
-            state.ghProfiles.push({ id: generateId(), name, token, active: isFirst, username: null });
+            state.ghProfiles.push({ id: generateId(), name, token, active: isFirst, username: username });
             toggleModal('ghModal');
             renderSettingsManagers();
             if(isFirst) checkActiveProfile();
@@ -836,8 +833,7 @@
         function renderAppGrid() {
             const grid = document.getElementById('appGrid');
             const empty = document.getElementById('hubEmpty');
-            const filter = document.getElementById('hubSearch').value.toLowerCase();
-            let filtered = state.discoveredApps.filter(app => app.title.toLowerCase().includes(filter) || app.category.toLowerCase().includes(filter));
+            let filtered = state.discoveredApps;
 
             if (filtered.length === 0) {
                 grid.innerHTML = ''; empty.classList.remove('hidden'); empty.classList.add('flex');
